@@ -80,10 +80,22 @@ public class Scanner {
                 this.addToken(this.match('=') ? GREATER_EQUAL : GREATER);
                 break;
             case '/':
-                if (match('/')) {
+                if (this.match('/')) {
                     // A comment goes until the end of the line.
-                    while (this.peek() != '\n' && !isAtEnd()) {
-                        advance();
+                    while (this.peek() != '\n' && !this.isAtEnd()) {
+                        this.advance();
+                    }
+                } else if (this.match('*')) {
+                    while (!this.isAtEnd()) {
+                        if (this.peek() == '*' && this.peekNext() == '/') {
+                            this.advance();
+                            this.advance();
+                            break;
+                        }
+                        if (this.peek() == '\n') {
+                            this.line++;
+                        }
+                        this.advance();
                     }
                 } else {
                     addToken(SLASH);
