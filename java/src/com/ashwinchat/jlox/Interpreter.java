@@ -178,7 +178,10 @@ public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitExpressionStmt(Stmt.Expression stmt) {
-        this.evaluate(stmt.expression);
+        Object value = this.evaluate(stmt.expression);
+        if (Lox.replMode) {
+            System.out.println(this.stringify(value));
+        }
         return null;
     }
 
