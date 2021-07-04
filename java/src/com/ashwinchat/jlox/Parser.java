@@ -1,6 +1,7 @@
 package com.ashwinchat.jlox;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.ashwinchat.jlox.TokenType.*;
@@ -48,10 +49,86 @@ public class Parser {
         if (this.match(PRINT)) {
             return this.printStatement();
         }
+        if (this.match(WHILE)) {
+            return this.whileStatement();
+        }
         if (this.match(LEFT_BRACE)) {
             return new Stmt.Block(this.block());
         }
+        if (this.match(FOR)) {
+            return this.forStatement();
+        }
+        if (this.match(IF)) {
+            return this.ifStatement();
+        }
+
         return this.expressionStatement();
+    }
+
+    private Stmt forStatement() {
+        this.consume(LEFT_PAREN, "Expect '(' after 'for'.");
+
+        Stmt initalizer;
+        if (this.match(SEMICOLON)) {
+            initalizer = null;
+        } else if (this.match(VAR)) {
+            initalizer = varDeclaration();
+        } else {
+            initalizer = this.expressionStatement();
+        }
+
+        Expr condition = null;
+        if (!this.check(SEMICOLON)) {
+            condition = this.expression();
+        }
+        this.consume(SEMICOLON, "Expect ';' after loop condition.");
+
+        Expr increment = null;
+        if (!this.check(RIGHT_PAREN)) {
+            increment = this.expression();
+        }
+        this.consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+
+        Stmt body = this.statement();
+        if (increment != null) {
+            body = new Stmt.Block(
+                    Arrays.asList(body, new Stmt.Expression(increment))
+            );
+        }
+
+        if (condition == null) {
+            condition = new Expr.Literal(true);
+        }
+        body = new Stmt.While(condition, body);
+
+        if (initalizer != null) {
+            body = new Stmt.Block(Arrays.asList(initalizer, body));
+        }
+
+        return body;
+    }
+
+    private Stmt whileStatement() {
+        this.consume(LEFT_PAREN, "Expect '(' after 'while'.");
+        Expr condition = this.expression();
+        this.consume(RIGHT_PAREN, "expect ')' after condition.");
+        Stmt body = this.statement();
+
+        return new Stmt.While(condition, body);
+    }
+
+    private Stmt ifStatement() {
+        this.consume(LEFT_PAREN, "Expect '(' after 'if'.");
+        Expr condition = this.expression();
+        this.consume(RIGHT_PAREN, "expect ')' after if condition.");
+
+        Stmt thenBranch = this.statement();
+        Stmt elseBranch = null;
+        if (this.match(ELSE)) {
+            elseBranch = this.statement();
+        }
+
+        return new Stmt.If(condition, thenBranch, elseBranch);
     }
 
     private List<Stmt> block() {
@@ -85,7 +162,7 @@ public class Parser {
          * Example: NewObject(x, y).x = (5 + 2) * 3;
          * L-Value must be evaluated before the assignment happens.
          */
-        Expr expr = this.equality();
+        Expr expr = this.or();
         if (this.match(EQUAL)) {
             Token equals = this.previous();
             Expr value = this.assignment();
@@ -96,6 +173,30 @@ public class Parser {
             }
             error(equals, "Invalid assignment target.");
         }
+        return expr;
+    }
+
+    private Expr or() {
+        Expr expr = this.and();
+
+        while (this.match(OR)) {
+            Token operator = this.previous();
+            Expr right = this.and();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+
+        return expr;
+    }
+
+    private Expr and() {
+        Expr expr = this.equality();
+
+        while (this.match(AND)) {
+            Token operator = this.previous();
+            Expr right = this.equality();
+            expr = new Expr.Logical(expr, operator, right);
+        }
+
         return expr;
     }
 
