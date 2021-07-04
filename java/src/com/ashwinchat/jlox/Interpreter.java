@@ -1,6 +1,35 @@
 package com.ashwinchat.jlox;
 
-public class Interpreter implements Expr.Visitor<Object> {
+import java.util.List;
+
+public class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
+    private Environment environment = new Environment();
+
+    @Override
+    public Object visitAssignExpr(Expr.Assign expr) {
+        Object value = this.evaluate(expr.value);
+        environment.assign(expr.name, value);
+        return value;
+    }
+
+    @Override
+    public Void visitBlockStmt(Stmt.Block stmt) {
+        this.executeBlock(stmt.statements, new Environment(this.environment));
+        return null;
+    }
+
+    private void executeBlock(List<Stmt> statements, Environment environment) {
+        Environment previous = this.environment;
+        try {
+            this.environment = environment;
+            for (Stmt statement : statements) {
+                this.execute(statement);
+            }
+        } finally {
+            this.environment = previous;
+        }
+    }
+
     @Override
     public Object visitBinaryExpr(Expr.Binary expr) {
         Object left = this.evaluate(expr.left);
@@ -73,6 +102,11 @@ public class Interpreter implements Expr.Visitor<Object> {
         return null;
     }
 
+    @Override
+    public Object visitVariableExpr(Expr.Variable expr) {
+        return environment.get(expr.name);
+    }
+
     private boolean truthy(Object object) {
         if (object == null) {
             return false;
@@ -112,13 +146,18 @@ public class Interpreter implements Expr.Visitor<Object> {
         throw new RuntimeError(operator, "Operands must be a number.");
     }
 
-    void interpret(Expr expression) {
+    void interpret(List<Stmt> statements) {
         try {
-            Object value = this.evaluate(expression);
-            System.out.println(this.stringify(value));
+            for (Stmt statement : statements) {
+                this.execute(statement);
+            }
         } catch (RuntimeError error) {
             Lox.runtimeError(error);
         }
+    }
+
+    private void execute(Stmt statement) {
+        statement.accept(this);
     }
 
     private String stringify(Object object) {
@@ -135,5 +174,28 @@ public class Interpreter implements Expr.Visitor<Object> {
         }
 
         return object.toString();
+    }
+
+    @Override
+    public Void visitExpressionStmt(Stmt.Expression stmt) {
+        this.evaluate(stmt.expression);
+        return null;
+    }
+
+    @Override
+    public Void visitPrintStmt(Stmt.Print stmt) {
+        Object value = this.evaluate(stmt.expression);
+        System.out.println(this.stringify(value));
+        return null;
+    }
+
+    @Override
+    public Void visitVarStmt(Stmt.Var stmt) {
+        Object value = null;
+        if (stmt.initializer != null) {
+            value = this.evaluate(stmt.initializer);
+        }
+        environment.define(stmt.name.lexeme, value);
+        return null;
     }
 }

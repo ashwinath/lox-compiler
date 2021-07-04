@@ -1,5 +1,6 @@
 package com.ashwinchat.jlox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.ashwinchat.jlox.TokenType.*;
@@ -13,16 +14,89 @@ public class Parser {
         this.tokens = tokens;
     }
 
-    Expr parse() {
+    List<Stmt> parse() {
+        List<Stmt> statements = new ArrayList<>();
+        while (!this.isAtEnd()) {
+            statements.add(this.declaration());
+        }
+        return statements;
+    }
+
+    private Stmt declaration() {
         try {
-            return expression();
+            if (this.match(VAR)) {
+                return this.varDeclaration();
+            }
+            return this.statement();
         } catch (ParseError error) {
+            this.synchronize();
             return null;
         }
     }
 
+    private Stmt varDeclaration() {
+        Token name = this.consume(IDENTIFIER, "Expect variable name.");
+        Expr initializer = null;
+        if (this.match(EQUAL)) {
+            initializer = this.expression();
+        }
+        this.consume(SEMICOLON, "Expect ';' after variable declaration.");
+        return new Stmt.Var(name, initializer);
+    }
+
+    private Stmt statement() {
+        if (this.match(PRINT)) {
+            return this.printStatement();
+        }
+        if (this.match(LEFT_BRACE)) {
+            return new Stmt.Block(this.block());
+        }
+        return this.expressionStatement();
+    }
+
+    private List<Stmt> block() {
+        List<Stmt> statements = new ArrayList<>();
+        while (!this.check(RIGHT_BRACE) && !this.isAtEnd()) {
+            statements.add(this.declaration());
+        }
+        this.consume(RIGHT_BRACE, "Expect '}' after block.");
+        return statements;
+    }
+
+    private Stmt expressionStatement() {
+        Expr expr = this.expression();
+        this.consume(SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Expression(expr);
+    }
+
+    private Stmt printStatement() {
+        Expr value = this.expression();
+        this.consume(SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Print(value);
+    }
+
     private Expr expression() {
-        return equality();
+        return this.assignment();
+    }
+
+    private Expr assignment() {
+        /*
+         * This is interesting because you want to evaluate the L-Value as well.
+         * Example: NewObject(x, y).x = (5 + 2) * 3;
+         * L-Value must be evaluated before the assignment happens.
+         */
+        Expr expr = this.equality();
+        if (this.match(EQUAL)) {
+            Token equals = this.previous();
+            Expr value = this.assignment();
+
+            if (expr instanceof Expr.Variable) {
+                Token name = ((Expr.Variable) expr).name;
+                return new Expr.Assign(name, value);
+            }
+            error(equals, "Invalid assignment target.");
+        }
+        return expr;
     }
 
     private Expr equality() {
@@ -101,6 +175,10 @@ public class Parser {
             Expr expr = this.expression();
             this.consume(RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
+        }
+
+        if (this.match(IDENTIFIER)) {
+            return new Expr.Variable(this.previous());
         }
 
         throw error(this.peek(), "Expect expression.");
