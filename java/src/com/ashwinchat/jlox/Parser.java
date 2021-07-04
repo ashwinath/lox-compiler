@@ -10,6 +10,7 @@ public class Parser {
     private static class ParseError extends RuntimeException {}
     private final List<Token> tokens;
     private int current = 0;
+    private int loopDepth = 0;
 
     Parser(List<Token> tokens) {
         this.tokens = tokens;
@@ -61,8 +62,19 @@ public class Parser {
         if (this.match(IF)) {
             return this.ifStatement();
         }
+        if (this.match(BREAK)) {
+            return this.breakStatement();
+        }
 
         return this.expressionStatement();
+    }
+
+    private Stmt breakStatement() {
+        if (loopDepth == 0) {
+            this.error(this.previous(), "Must be inside a loop to use 'break'.");
+        }
+        this.consume(SEMICOLON, "Expect ';' after 'break'.");
+        return new Stmt.Break();
     }
 
     private Stmt forStatement() {
@@ -89,32 +101,43 @@ public class Parser {
         }
         this.consume(RIGHT_PAREN, "Expect ')' after for clauses.");
 
-        Stmt body = this.statement();
-        if (increment != null) {
-            body = new Stmt.Block(
-                    Arrays.asList(body, new Stmt.Expression(increment))
-            );
+        try {
+            loopDepth++;
+            Stmt body = this.statement();
+            if (increment != null) {
+                body = new Stmt.Block(
+                        Arrays.asList(body, new Stmt.Expression(increment))
+                );
+            }
+
+            if (condition == null) {
+                condition = new Expr.Literal(true);
+            }
+            body = new Stmt.While(condition, body);
+
+            if (initalizer != null) {
+                body = new Stmt.Block(Arrays.asList(initalizer, body));
+            }
+
+            return body;
+        } finally {
+            loopDepth--;
         }
 
-        if (condition == null) {
-            condition = new Expr.Literal(true);
-        }
-        body = new Stmt.While(condition, body);
-
-        if (initalizer != null) {
-            body = new Stmt.Block(Arrays.asList(initalizer, body));
-        }
-
-        return body;
     }
 
     private Stmt whileStatement() {
         this.consume(LEFT_PAREN, "Expect '(' after 'while'.");
         Expr condition = this.expression();
         this.consume(RIGHT_PAREN, "expect ')' after condition.");
-        Stmt body = this.statement();
 
-        return new Stmt.While(condition, body);
+        try {
+            loopDepth++;
+            Stmt body = this.statement();
+            return new Stmt.While(condition, body);
+        } finally {
+            loopDepth--;
+        }
     }
 
     private Stmt ifStatement() {
