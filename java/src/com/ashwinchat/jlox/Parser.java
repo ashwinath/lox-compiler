@@ -26,6 +26,9 @@ public class Parser {
 
     private Stmt declaration() {
         try {
+            if (this.match(FUN)) {
+                return this.function("function");
+            }
             if (this.match(VAR)) {
                 return this.varDeclaration();
             }
@@ -34,6 +37,26 @@ public class Parser {
             this.synchronize();
             return null;
         }
+    }
+
+    private Stmt.Function function(String kind) {
+        Token name = this.consume(IDENTIFIER, "Expect " + kind + " name.");
+        this.consume(LEFT_PAREN, "Expect '(' after " + kind + " name.");
+        List<Token> parameters = new ArrayList<>();
+        if (!this.check(RIGHT_PAREN)) {
+            do {
+                if (parameters.size() >= 255) {
+                    this.error(this.peek(), "Can't have more than 255 parameters");
+                }
+
+                parameters.add(this.consume(IDENTIFIER, "Expect parameter name."));
+            } while (this.match(COMMA));
+        }
+        this.consume(RIGHT_PAREN, "Expect ')' after parameters.");
+
+        this.consume(LEFT_BRACE, "Expect '{' before " + kind + " body.");
+        List<Stmt> body = this.block();
+        return new Stmt.Function(name, parameters, body);
     }
 
     private Stmt varDeclaration() {
@@ -49,6 +72,9 @@ public class Parser {
     private Stmt statement() {
         if (this.match(PRINT)) {
             return this.printStatement();
+        }
+        if (this.match(RETURN)) {
+            return this.returnStatement();
         }
         if (this.match(WHILE)) {
             return this.whileStatement();
@@ -67,6 +93,17 @@ public class Parser {
         }
 
         return this.expressionStatement();
+    }
+
+    private Stmt returnStatement() {
+        Token keyword = this.previous();
+        Expr value = null;
+        if (!this.check(SEMICOLON)) {
+            value = expression();
+        }
+
+        this.consume(SEMICOLON, "Expect ';' after return value.");
+        return new Stmt.Return(keyword, value);
     }
 
     private Stmt breakStatement() {
@@ -277,7 +314,36 @@ public class Parser {
             Expr right = this.unary();
             return new Expr.Unary(operator, right);
         }
-        return this.primary();
+        return this.call();
+    }
+
+    private Expr call() {
+        Expr expr = this.primary();
+
+        while (true) {
+            if (this.match(LEFT_PAREN)) {
+                expr = this.finishCall(expr);
+            } else {
+                break;
+            }
+        }
+        return expr;
+    }
+
+    private Expr finishCall(Expr callee) {
+        List<Expr> arguments = new ArrayList<>();
+        if (!this.check(RIGHT_PAREN)) {
+            do {
+                if (arguments.size() >= 255) {
+                    this.error(this.peek(), "Can't have more than 255 arguments");
+                }
+                arguments.add(this.expression());
+            } while (this.match(COMMA));
+        }
+
+        Token paren = this.consume(RIGHT_PAREN, "Expect ')' after arguments");
+
+        return new Expr.Call(callee, paren, arguments);
     }
 
     private Expr primary() {
@@ -347,7 +413,7 @@ public class Parser {
 
     private Token consume(TokenType type, String message) {
         if (this.check(type)) {
-            return advance();
+            return this.advance();
         }
         throw this.error(this.peek(), message);
     }
