@@ -9,10 +9,18 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     private final Interpreter interpreter;
     private final Stack<Map<String, Boolean>> scopes = new Stack<>();
     private FunctionType currentFunction = FunctionType.NONE;
+    private ClassType currentClass = ClassType.NONE;
 
     private enum FunctionType {
         NONE,
-        FUNCTION
+        FUNCTION,
+        METHOD,
+        INITIALIZER
+    }
+
+    private enum ClassType {
+        NONE,
+        CLASS
     }
 
     Resolver(Interpreter interpreter) {
@@ -167,10 +175,13 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
 
     @Override
     public Void visitReturnStmt(Stmt.Return stmt) {
-        if (currentFunction == FunctionType.NONE) {
+        if (this.currentFunction == FunctionType.NONE) {
             Lox.error(stmt.keyword, "Can't return from top-level code.");
         }
         if (stmt.value != null) {
+            if (this.currentFunction == FunctionType.INITIALIZER) {
+                Lox.error(stmt.keyword, "Can't return a value from an initializer.");
+            }
             this.resolve(stmt.value);
         }
         return null;
@@ -211,6 +222,54 @@ public class Resolver implements Expr.Visitor<Void>, Stmt.Visitor<Void> {
     public Void visitWhileStmt(Stmt.While stmt) {
         this.resolve(stmt.condition);
         this.resolve(stmt.body);
+        return null;
+    }
+
+    @Override
+    public Void visitClassStmt(Stmt.Class stmt) {
+        ClassType enclosingClass = this.currentClass;
+        currentClass = ClassType.CLASS;
+
+        this.declare(stmt.name);
+        this.define(stmt.name);
+
+        this.beginScope();
+        this.scopes.peek().put("this", true);
+
+        for (Stmt.Function method : stmt.methods) {
+            FunctionType declaration = FunctionType.METHOD;
+            if (method.name.lexeme.equals("this")) {
+                declaration = FunctionType.INITIALIZER;
+            }
+            this.resolveFunction(method, declaration);
+        }
+
+        this.endScope();
+
+        this.currentClass = enclosingClass;
+        return null;
+    }
+
+    @Override
+    public Void visitGetExpr(Expr.Get expr) {
+        this.resolve(expr.object);
+        return null;
+    }
+
+    @Override
+    public Void visitSetExpr(Expr.Set expr) {
+        this.resolve(expr.value);
+        this.resolve(expr.object);
+        return null;
+    }
+
+    @Override
+    public Void visitThisExpr(Expr.This expr) {
+        if (this.currentClass == ClassType.NONE) {
+            Lox.error(expr.keyword, "Can't use 'this' outside of a class.");
+            return null;
+        }
+        this.resolveLocal(expr, expr.keyword);
         return null;
     }
 }

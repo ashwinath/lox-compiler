@@ -26,6 +26,9 @@ public class Parser {
 
     private Stmt declaration() {
         try {
+            if (this.match(CLASS)) {
+                return this.classDeclaration();
+            }
             if (this.match(FUN)) {
                 return this.function("function");
             }
@@ -37,6 +40,20 @@ public class Parser {
             this.synchronize();
             return null;
         }
+    }
+
+    private Stmt classDeclaration() {
+        Token name = this.consume(IDENTIFIER, "Expect class name.");
+        this.consume(LEFT_BRACE, "Expect '{' before class body");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!this.check(RIGHT_BRACE) && !this.isAtEnd()) {
+            methods.add(this.function("method"));
+        }
+
+        this.consume(RIGHT_BRACE, "Expect '}' after class body.");
+
+        return new Stmt.Class(name, methods);
     }
 
     private Stmt.Function function(String kind) {
@@ -230,6 +247,9 @@ public class Parser {
             if (expr instanceof Expr.Variable) {
                 Token name = ((Expr.Variable) expr).name;
                 return new Expr.Assign(name, value);
+            } else if (expr instanceof Expr.Get) {
+                Expr.Get get = (Expr.Get) expr;
+                return new Expr.Set(get.object, get.name, value);
             }
             error(equals, "Invalid assignment target.");
         }
@@ -323,6 +343,9 @@ public class Parser {
         while (true) {
             if (this.match(LEFT_PAREN)) {
                 expr = this.finishCall(expr);
+            } else if (this.match(DOT)) {
+                Token name = this.consume(IDENTIFIER, "Expect property name after '.'.");
+                expr = new Expr.Get(expr, name);
             } else {
                 break;
             }
@@ -365,6 +388,10 @@ public class Parser {
             Expr expr = this.expression();
             this.consume(RIGHT_PAREN, "Expect ')' after expression.");
             return new Expr.Grouping(expr);
+        }
+
+        if (this.match(THIS)) {
+            return new Expr.This(this.previous());
         }
 
         if (this.match(IDENTIFIER)) {
