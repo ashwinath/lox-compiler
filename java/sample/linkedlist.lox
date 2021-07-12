@@ -1,0 +1,45 @@
+class Node {
+    init(value) {
+        this.value = value;
+        this.next = nil;
+    }
+}
+
+class LinkedList {
+    init() {
+        this.startNode = nil;
+    }
+
+    add(value) {
+        if (this.startNode == nil) {
+            this.startNode = Node(value);
+            return;
+        }
+
+        var node = this.startNode;
+        while (node.next != nil) {
+            node = node.next;
+        }
+        node.next = Node(value);
+    }
+
+    loop(function) {
+        var node = this.startNode;
+        while (node != nil) {
+            function(node.value);
+            node = node.next;
+        }
+    }
+}
+
+var list = LinkedList();
+list.add(10);
+list.add("hello world");
+list.add("hello biscuits");
+
+
+fun printAll(item) {
+    print item;
+}
+
+list.loop(printAll);
