@@ -46,7 +46,7 @@ public class LoxArray extends LoxInstance {
                 }
             };
         } else if (name.lexeme.equals("length")) {
-            return elements.length;
+            return (double) elements.length;
         }
 
         throw new RuntimeError(name, "Undefined property '" + name.lexeme + "'.");

@@ -1,0 +1,135 @@
+/*
+ * A Node is a single node of a linked list.
+ */
+class Node {
+    init(value) {
+        this.value = value;
+        this.next = nil;
+    }
+}
+
+/*
+ * A LinkedList is a list that is heap allocated.
+ */
+class LinkedList {
+    init() {
+        this.startNode = nil;
+    }
+
+    /*
+     * Appends to the end of the linked list.
+     */
+    add(value) {
+        if (this.startNode == nil) {
+            this.startNode = Node(value);
+            return;
+        }
+
+        var node = this.startNode;
+        while (node.next != nil) {
+            node = node.next;
+        }
+        node.next = Node(value);
+    }
+
+    /*
+     * Returns the size of the linked list.
+     */
+    size() {
+        var counter = 0;
+        var node = this.startNode;
+
+        while (node != nil) {
+            counter = counter + 1;
+            node = node.next;
+        }
+        return counter;
+    }
+
+    /*
+     * Helper method to loop through the LinkedList.
+     */
+    loop(function) {
+        var node = this.startNode;
+        while (node != nil) {
+            function(node.value);
+            node = node.next;
+        }
+    }
+}
+
+/*
+ * A List is a dynamically sized array.
+ */
+class List {
+    init() {
+        // Constants
+        this.INITIAL_SIZE = 10;
+        this.INCREASE_MULTIPLIER = 1.5;
+
+        this._array = Array(this.INITIAL_SIZE);
+        this._size = 0;
+    }
+
+    /*
+     * Add an element to the list.
+     */
+    add(item) {
+        if (this.isFull()) {
+            var newArray = Array(this.size * this.INCREASE_MULTIPLIER);
+            for (var i = 0; i < this._array.length; i = i + 1) {
+                newArray.set(i, this._array.get(i));
+            }
+            this._array = newArray;
+        }
+        this._array.set(this._size, item);
+        this._size = this._size + 1;
+    }
+
+    /*
+     * Get an element at that index.
+     */
+    get(index) {
+        if (index > this._size - 1) {
+            return nil;
+        }
+        return this._array.get(index);
+    }
+
+    /*
+     * Checks if the capacity of the array is at it's maximum.
+     */
+    isFull() {
+        return this._size == this._array.length;
+    }
+
+    /*
+     * Returns the size of the list.
+     */
+    size() {
+        return this._size;
+    }
+
+    /*
+     * Returns the capacity of the underlying _array.
+     */
+    capacity() {
+        return this._array.length;
+    }
+
+    /*
+     * Helper method to loop through the list.
+     */
+    loop(function) {
+        for (var i = 0; i < this._size; i = i+1) {
+            function(this._array.get(i));
+        }
+    }
+}
+
+class KV {
+    init(key, value) {
+        this.key = key;
+        this.value = LinkedList();
+    }
+}
