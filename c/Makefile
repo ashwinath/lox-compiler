@@ -4,5 +4,5 @@ build:
 	@mkdir -p bin
 	@gcc $(BUILD_FLAGS) \
 		-std=c99 \
-		-o bin/compiler \
+		-o bin/clox \
 		src/*.c
