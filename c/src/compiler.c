@@ -155,8 +155,6 @@ static void unary() {
     // compile the operand
     expression();
 
-    parsePrecedence(PREC_UNARY);
-
     switch (operatorType) {
         case TOKEN_MINUS: emitByte(OP_NEGATE); break;
         default: return; // unreachable
